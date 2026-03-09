@@ -200,6 +200,7 @@ Backend:
 This project was developed as a **Grade 12 Computer Science project** to demonstrate:
 
 - Web application development
+- Using Version Control
 - Frontend and backend integration
 - Database management
 - Input validation
