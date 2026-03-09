@@ -7,8 +7,6 @@ The goal of the system is to prevent overlapping tests that can cause stress for
 Teachers can view existing reservations, select available dates, and book their own tests.  
 The system automatically prevents conflicts when tests with the same credit value are scheduled on the same day.
 
-For Grade 11 and 12, High School and IB tests are allowed to occur on the same day.
-
 ---
 
 # Prerequisites
@@ -200,6 +198,7 @@ Backend:
 This project was developed as a **Grade 12 Computer Science project** to demonstrate:
 
 - Web application development
+- Using Version Control
 - Frontend and backend integration
 - Database management
 - Input validation
