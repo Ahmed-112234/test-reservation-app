@@ -6,35 +6,31 @@ import interactionPlugin from "@fullcalendar/interaction";
 import { sendApiRequest } from "../api.js";
 
 const subjectOptions = [
-  { name: "Arabic B IB HL", category: "IB", gradeGroup: "11-12" },
-  { name: "Business Manag. IB HL", category: "IB", gradeGroup: "11-12" },
-  { name: "Computer Science", category: "General", gradeGroup: "All" },
-  { name: "Economics IB HL", category: "IB", gradeGroup: "11-12" },
-  { name: "English Lang-Lit IB SL", category: "IB", gradeGroup: "11-12" },
-  { name: "Islamic Studies 11 IB", category: "IB", gradeGroup: "11" },
-  { name: "Math Applications & Int. 11 IB SL", category: "IB", gradeGroup: "11" },
-  { name: "PE Boys", category: "General", gradeGroup: "All" },
-  { name: "Theory of Knowledge", category: "IB", gradeGroup: "11-12" },
-  { name: "National-Social Studies", category: "General", gradeGroup: "All" },
-  { name: "Arabic Acquisition MYP", category: "MYP", gradeGroup: "MYP" },
-  { name: "Arabic literature MYP", category: "MYP", gradeGroup: "MYP" },
-  { name: "English Lang-Lit MYP", category: "MYP", gradeGroup: "MYP" },
-  { name: "Homeroom Secondary School1_HRSS", category: "Section 1", gradeGroup: "Section 1" },
-  { name: "Integrated Humanities MYP 10", category: "MYP", gradeGroup: "10" },
-  { name: "Integrated Science MYP 10", category: "MYP", gradeGroup: "10" },
-  { name: "Islamic Studies 10", category: "MYP", gradeGroup: "10" },
-  { name: "Mathematics MYP 10", category: "MYP", gradeGroup: "10" },
-  { name: "PE 10 Boys", category: "MYP", gradeGroup: "10" },
-  { name: "Theatre MYP 10", category: "MYP", gradeGroup: "10" },
-  { name: "Arabic Acquisition MYP 9", category: "MYP", gradeGroup: "9" },
-  { name: "Biology MYP", category: "MYP", gradeGroup: "MYP" },
-  { name: "Chemistry & Physics MYP", category: "MYP", gradeGroup: "MYP" },
-  { name: "English Lang-Lit MYP 9", category: "MYP", gradeGroup: "9" },
-  { name: "Integrated Humanities MYP", category: "MYP", gradeGroup: "MYP" },
-  { name: "Islamic Studies", category: "General", gradeGroup: "All" },
-  { name: "Mathematics MYP", category: "MYP", gradeGroup: "MYP" },
-  { name: "PE", category: "General", gradeGroup: "All" },
-  { name: "Theatre MYP", category: "MYP", gradeGroup: "MYP" }
+  { name: "Arabic", category: "IB" },
+  { name: "Business Management", category: "IB" },
+  { name: "Computer Science", category: "General" },
+  { name: "Economics", category: "IB" },
+  { name: "English Lang-Lit", category: "IB" },
+  { name: "Islamic Studies", category: "IB" },
+  { name: "Math Applications & Int.", category: "IB" },
+  { name: "Theory of Knowledge", category: "IB" },
+  { name: "National-Social Studies", category: "General" },
+  { name: "Arabic Acquisition", category: "MYP" },
+  { name: "Arabic literature", category: "MYP" },
+  { name: "English Lang-Lit", category: "MYP" },
+  { name: "Integrated Humanities", category: "MYP" },
+  { name: "Integrated Science", category: "MYP" },
+  { name: "Islamic Studies", category: "MYP" },
+  { name: "Mathematics", category: "MYP" },
+  { name: "Theatre", category: "MYP" },
+  { name: "Arabic Acquisition", category: "MYP" },
+  { name: "Biology", category: "MYP" },
+  { name: "Chemistry & Physics", category: "MYP" },
+  { name: "English Lang-Lit", category: "MYP" },
+  { name: "Integrated Humanities", category: "MYP" },
+  { name: "Islamic Studies", category: "General" },
+  { name: "Mathematics", category: "MYP" },
+  { name: "PE", category: "General" },
 ];
 
 export default function DashboardPage() {
@@ -63,7 +59,8 @@ export default function DashboardPage() {
     subjectName: "Computer Science",
     gradeLevel: 10,
     programType: "",
-    creditCount: 3
+    testType: "summative",
+    creditCount: 1
   });
 
   const [modalFormData, setModalFormData] = useState({
@@ -72,6 +69,7 @@ export default function DashboardPage() {
     subjectName: "",
     gradeLevel: 10,
     programType: "",
+    testType: "summative",
     creditCount: 1
   });
 
@@ -104,6 +102,7 @@ export default function DashboardPage() {
         eventTitle += ` • ${reservation.program_type}`;
       }
 
+      eventTitle += ` • ${reservation.test_type}`;
       eventTitle += ` • ${reservation.credit_count}cr • ${reservation.username}`;
 
       return {
@@ -132,8 +131,7 @@ export default function DashboardPage() {
     if (normalizedSearchText) {
       list = list.filter((subject) =>
         subject.name.toLowerCase().includes(normalizedSearchText) ||
-        subject.category.toLowerCase().includes(normalizedSearchText) ||
-        subject.gradeGroup.toLowerCase().includes(normalizedSearchText)
+        subject.category.toLowerCase().includes(normalizedSearchText)
       );
     }
 
@@ -155,16 +153,6 @@ export default function DashboardPage() {
       });
     }
 
-    if (subjectSortOption === "grade-group") {
-      list.sort((firstItem, secondItem) => {
-        const gradeCompare = firstItem.gradeGroup.localeCompare(secondItem.gradeGroup);
-        if (gradeCompare !== 0) {
-          return gradeCompare;
-        }
-        return firstItem.name.localeCompare(secondItem.name);
-      });
-    }
-
     return list;
   }, [subjectSearchText, subjectSortOption, subjectCategoryFilter]);
 
@@ -180,8 +168,7 @@ export default function DashboardPage() {
     if (normalizedSearchText) {
       list = list.filter((subject) =>
         subject.name.toLowerCase().includes(normalizedSearchText) ||
-        subject.category.toLowerCase().includes(normalizedSearchText) ||
-        subject.gradeGroup.toLowerCase().includes(normalizedSearchText)
+        subject.category.toLowerCase().includes(normalizedSearchText)
       );
     }
 
@@ -198,16 +185,6 @@ export default function DashboardPage() {
         const categoryCompare = firstItem.category.localeCompare(secondItem.category);
         if (categoryCompare !== 0) {
           return categoryCompare;
-        }
-        return firstItem.name.localeCompare(secondItem.name);
-      });
-    }
-
-    if (editSubjectSortOption === "grade-group") {
-      list.sort((firstItem, secondItem) => {
-        const gradeCompare = firstItem.gradeGroup.localeCompare(secondItem.gradeGroup);
-        if (gradeCompare !== 0) {
-          return gradeCompare;
         }
         return firstItem.name.localeCompare(secondItem.name);
       });
@@ -233,6 +210,30 @@ export default function DashboardPage() {
     );
   }
 
+  function getReservedCreditsForDay(dateText) {
+    return reservationList.reduce((total, reservation) => {
+      if (reservation.test_date !== dateText) {
+        return total;
+      }
+
+      return total + Number(reservation.credit_count);
+    }, 0);
+  }
+
+  function getReservedCreditsForEditDay(dateText) {
+    return reservationList.reduce((total, reservation) => {
+      if (reservation.id === modalFormData.id) {
+        return total;
+      }
+
+      if (reservation.test_date !== dateText) {
+        return total;
+      }
+
+      return total + Number(reservation.credit_count);
+    }, 0);
+  }
+
   function isDateUnavailable(dateText) {
     if (isOutsideBookingWindow(dateText)) {
       return true;
@@ -241,11 +242,20 @@ export default function DashboardPage() {
     const selectedGradeIsSenior =
       formData.gradeLevel === 11 || formData.gradeLevel === 12;
 
-    return reservationList.some((reservation) => {
-      if (reservation.test_date !== dateText) {
-        return false;
-      }
+    const sameDayReservations = reservationList.filter(
+      (reservation) => reservation.test_date === dateText
+    );
 
+    const reservedCredits = sameDayReservations.reduce(
+      (total, reservation) => total + Number(reservation.credit_count),
+      0
+    );
+
+    if (reservedCredits + Number(formData.creditCount) > 1.5) {
+      return true;
+    }
+
+    return sameDayReservations.some((reservation) => {
       if (Number(reservation.credit_count) !== Number(formData.creditCount)) {
         return false;
       }
@@ -269,15 +279,21 @@ export default function DashboardPage() {
     const selectedGradeIsSenior =
       modalFormData.gradeLevel === 11 || modalFormData.gradeLevel === 12;
 
-    return reservationList.some((reservation) => {
-      if (reservation.id === modalFormData.id) {
-        return false;
-      }
+    const sameDayReservations = reservationList.filter(
+      (reservation) =>
+        reservation.id !== modalFormData.id && reservation.test_date === dateText
+    );
 
-      if (reservation.test_date !== dateText) {
-        return false;
-      }
+    const reservedCredits = sameDayReservations.reduce(
+      (total, reservation) => total + Number(reservation.credit_count),
+      0
+    );
 
+    if (reservedCredits + Number(modalFormData.creditCount) > 1.5) {
+      return true;
+    }
+
+    return sameDayReservations.some((reservation) => {
       if (Number(reservation.credit_count) !== Number(modalFormData.creditCount)) {
         return false;
       }
@@ -314,12 +330,29 @@ export default function DashboardPage() {
       errors.programType = "Please select High School or IB";
     }
 
-    if (!Number.isInteger(Number(formData.creditCount)) || Number(formData.creditCount) < 1) {
-      errors.creditCount = "Credits must be at least 1";
+    if (!formData.testType) {
+      errors.testType = "Please select a test type";
+    }
+
+    const mainCredits = Number(formData.creditCount);
+
+    if (Number.isNaN(mainCredits)) {
+      errors.creditCount = "Credits must be a number";
+    } else if (mainCredits < 0.5 || mainCredits > 1) {
+      errors.creditCount = "Credits must be between 0.5 and 1";
     }
 
     if (formData.testDate && isOutsideBookingWindow(formData.testDate)) {
       errors.testDate = "Date must be within the booking window";
+    }
+
+    if (
+      formData.testDate &&
+      !errors.testDate &&
+      !errors.creditCount &&
+      getReservedCreditsForDay(formData.testDate) + mainCredits > 1.5
+    ) {
+      errors.testDate = "This day has reached the maximum total of 1.5 credits";
     }
 
     setValidationErrors(errors);
@@ -350,15 +383,29 @@ export default function DashboardPage() {
       errors.programType = "Please select High School or IB";
     }
 
-    if (
-      !Number.isInteger(Number(modalFormData.creditCount)) ||
-      Number(modalFormData.creditCount) < 1
-    ) {
-      errors.creditCount = "Credits must be at least 1";
+    if (!modalFormData.testType) {
+      errors.testType = "Please select a test type";
+    }
+
+    const modalCredits = Number(modalFormData.creditCount);
+
+    if (Number.isNaN(modalCredits)) {
+      errors.creditCount = "Credits must be a number";
+    } else if (modalCredits < 0.5 || modalCredits > 1) {
+      errors.creditCount = "Credits must be between 0.5 and 1";
     }
 
     if (modalFormData.testDate && isOutsideBookingWindow(modalFormData.testDate)) {
       errors.testDate = "Date must be within the booking window";
+    }
+
+    if (
+      modalFormData.testDate &&
+      !errors.testDate &&
+      !errors.creditCount &&
+      getReservedCreditsForEditDay(modalFormData.testDate) + modalCredits > 1.5
+    ) {
+      errors.testDate = "This day has reached the maximum total of 1.5 credits";
     }
 
     if (modalFormData.testDate && !errors.testDate && isEditDateUnavailable(modalFormData.testDate)) {
@@ -379,7 +426,10 @@ export default function DashboardPage() {
     try {
       const response = await sendApiRequest("/reservations", {
         method: "POST",
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          ...formData,
+          creditCount: Number(formData.creditCount)
+        })
       });
 
       setReservationList((currentList) =>
@@ -410,6 +460,7 @@ export default function DashboardPage() {
       subjectName: reservation.subject_name,
       gradeLevel: reservation.grade_level,
       programType: reservation.program_type || "",
+      testType: reservation.test_type || "summative",
       creditCount: reservation.credit_count
     });
     setModalValidationErrors({});
@@ -431,7 +482,10 @@ export default function DashboardPage() {
     try {
       const response = await sendApiRequest(`/reservations/${modalFormData.id}`, {
         method: "PUT",
-        body: JSON.stringify(modalFormData)
+        body: JSON.stringify({
+          ...modalFormData,
+          creditCount: Number(modalFormData.creditCount)
+        })
       });
 
       setReservationList((currentList) =>
@@ -547,7 +601,7 @@ export default function DashboardPage() {
                 if (isOutsideBookingWindow(info.dateStr)) {
                   setErrorMessage("This date is outside the booking window.");
                 } else {
-                  setErrorMessage("This date is unavailable for the selected credits.");
+                  setErrorMessage("This date is unavailable for the selected credits or exceeds 1.5 total credits.");
                 }
                 return;
               }
@@ -583,7 +637,7 @@ export default function DashboardPage() {
           />
 
           <p className="calendarHelpText">
-            Dimmed dates are outside the booking window. Existing test cards on a day show that it is already booked.
+            Dimmed dates are outside the booking window. Each day can have a maximum total of 1.5 credits.
           </p>
         </div>
 
@@ -665,11 +719,31 @@ export default function DashboardPage() {
               </>
             )}
 
+            <label className="inputLabel">Type of Test</label>
+            <select
+              className="textInput"
+              value={formData.testType}
+              onChange={(event) =>
+                setFormData({
+                  ...formData,
+                  testType: event.target.value
+                })
+              }
+            >
+              <option value="summative">Summative</option>
+              <option value="formative">Formative</option>
+            </select>
+            {validationErrors.testType && (
+              <div className="validationText">{validationErrors.testType}</div>
+            )}
+
             <label className="inputLabel">Credits</label>
             <input
               className="textInput"
               type="number"
-              min="1"
+              min="0.5"
+              max="1"
+              step="0.5"
               value={formData.creditCount}
               onChange={(event) =>
                 setFormData({
@@ -692,7 +766,7 @@ export default function DashboardPage() {
           </div>
 
           <p className="formHelpText">
-            Rule: two tests with the same credits cannot be booked on the same day. For grades 11 and 12, High School and IB can share the same day.
+            Rule: credits must be between 0.5 and 1, each day can only have 1.5 credits in total, and each reservation must have a test type.
           </p>
         </div>
       </div>
@@ -821,11 +895,32 @@ export default function DashboardPage() {
                 </>
               )}
 
+              <label className="inputLabel">Type of Test</label>
+              <select
+                className="textInput"
+                value={modalFormData.testType}
+                disabled={!isEditMode}
+                onChange={(event) =>
+                  setModalFormData({
+                    ...modalFormData,
+                    testType: event.target.value
+                  })
+                }
+              >
+                <option value="summative">Summative</option>
+                <option value="formative">Formative</option>
+              </select>
+              {modalValidationErrors.testType && (
+                <div className="validationText">{modalValidationErrors.testType}</div>
+              )}
+
               <label className="inputLabel">Credits</label>
               <input
                 className="textInput"
                 type="number"
-                min="1"
+                min="0.5"
+                max="1"
+                step="0.5"
                 value={modalFormData.creditCount}
                 disabled={!isEditMode}
                 onChange={(event) =>
@@ -864,6 +959,7 @@ export default function DashboardPage() {
                         subjectName: selectedReservation.subject_name,
                         gradeLevel: selectedReservation.grade_level,
                         programType: selectedReservation.program_type || "",
+                        testType: selectedReservation.test_type || "summative",
                         creditCount: selectedReservation.credit_count
                       });
                     }}
@@ -923,7 +1019,6 @@ export default function DashboardPage() {
                 <option value="name-asc">Name A-Z</option>
                 <option value="name-desc">Name Z-A</option>
                 <option value="category">Category</option>
-                <option value="grade-group">Grade group</option>
               </select>
             </div>
 
@@ -937,7 +1032,6 @@ export default function DashboardPage() {
                   <div className="subjectOptionName">{subject.name}</div>
                   <div className="subjectOptionMeta">
                     <span>{subject.category}</span>
-                    <span>{subject.gradeGroup}</span>
                   </div>
                 </button>
               ))}
@@ -985,7 +1079,6 @@ export default function DashboardPage() {
                 <option value="IB">IB</option>
                 <option value="MYP">MYP</option>
                 <option value="General">General</option>
-                <option value="Section 1">Section 1</option>
               </select>
 
               <select
@@ -996,7 +1089,6 @@ export default function DashboardPage() {
                 <option value="name-asc">Name A-Z</option>
                 <option value="name-desc">Name Z-A</option>
                 <option value="category">Category</option>
-                <option value="grade-group">Grade group</option>
               </select>
             </div>
 
@@ -1010,7 +1102,6 @@ export default function DashboardPage() {
                   <div className="subjectOptionName">{subject.name}</div>
                   <div className="subjectOptionMeta">
                     <span>{subject.category}</span>
-                    <span>{subject.gradeGroup}</span>
                   </div>
                 </button>
               ))}

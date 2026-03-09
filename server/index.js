@@ -99,6 +99,7 @@ app.get("/reservations", checkLogin, async (request, response) => {
       reservations.subject_name,
       reservations.grade_level,
       reservations.program_type,
+      reservations.test_type,
       reservations.credit_count,
       teachers.username
     FROM reservations
@@ -114,7 +115,8 @@ const reservationSchema = z.object({
   subjectName: z.string().min(1),
   gradeLevel: z.number().int().min(1).max(12),
   programType: z.string().optional(),
-  creditCount: z.number().int().min(1)
+  testType: z.enum(["summative", "formative"]),
+  creditCount: z.number().min(0.5).max(1)
 });
 
 /* This function checks if a reservation conflicts with another one. */
@@ -130,13 +132,34 @@ async function checkReservationConflict(
     `
       SELECT *
       FROM reservations
-      WHERE test_date = ? AND credit_count = ?
+      WHERE test_date = ?
     `,
-    [testDate, creditCount]
+    [testDate]
   );
+
+  let totalCreditsForDay = 0;
 
   for (const reservation of existingReservations) {
     if (reservationIdToIgnore && reservation.id === reservationIdToIgnore) {
+      continue;
+    }
+
+    totalCreditsForDay += Number(reservation.credit_count);
+  }
+
+  if (totalCreditsForDay + Number(creditCount) > 1.5) {
+    return {
+      hasConflict: true,
+      message: "This day has reached the maximum total of 1.5 credits"
+    };
+  }
+
+  for (const reservation of existingReservations) {
+    if (reservationIdToIgnore && reservation.id === reservationIdToIgnore) {
+      continue;
+    }
+
+    if (Number(reservation.credit_count) !== Number(creditCount)) {
       continue;
     }
 
@@ -150,10 +173,16 @@ async function checkReservationConflict(
       }
     }
 
-    return true;
+    return {
+      hasConflict: true,
+      message: "A test with the same credits is already reserved on this day"
+    };
   }
 
-  return false;
+  return {
+    hasConflict: false,
+    message: ""
+  };
 }
 
 /* This function creates a new reservation if the rules are valid. */
@@ -164,7 +193,7 @@ app.post("/reservations", checkLogin, async (request, response) => {
     return response.status(400).json({ error: "Invalid reservation data" });
   }
 
-  const { testDate, subjectName, gradeLevel, programType, creditCount } = result.data;
+  const { testDate, subjectName, gradeLevel, programType, testType, creditCount } = result.data;
 
   const today = new Date();
   const firstAllowedDate = formatDateOnly(addDays(today, 7));
@@ -191,7 +220,7 @@ app.post("/reservations", checkLogin, async (request, response) => {
   const database = await getDatabase();
 
   try {
-    const hasConflict = await checkReservationConflict(
+    const conflictResult = await checkReservationConflict(
       database,
       testDate,
       creditCount,
@@ -199,17 +228,17 @@ app.post("/reservations", checkLogin, async (request, response) => {
       programType || null
     );
 
-    if (hasConflict) {
+    if (conflictResult.hasConflict) {
       return response.status(409).json({
-        error: "A test with the same credits is already reserved on this day"
+        error: conflictResult.message
       });
     }
 
     const insertResult = await database.run(
       `
         INSERT INTO reservations
-        (teacher_id, test_date, subject_name, grade_level, program_type, credit_count)
-        VALUES (?, ?, ?, ?, ?, ?)
+        (teacher_id, test_date, subject_name, grade_level, program_type, test_type, credit_count)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
       [
         request.teacher.id,
@@ -217,6 +246,7 @@ app.post("/reservations", checkLogin, async (request, response) => {
         subjectName,
         gradeLevel,
         programType || null,
+        testType,
         creditCount
       ]
     );
@@ -230,6 +260,7 @@ app.post("/reservations", checkLogin, async (request, response) => {
           reservations.subject_name,
           reservations.grade_level,
           reservations.program_type,
+          reservations.test_type,
           reservations.credit_count,
           teachers.username
         FROM reservations
@@ -259,7 +290,7 @@ app.put("/reservations/:id", checkLogin, async (request, response) => {
     return response.status(400).json({ error: "Invalid reservation data" });
   }
 
-  const { testDate, subjectName, gradeLevel, programType, creditCount } = result.data;
+  const { testDate, subjectName, gradeLevel, programType, testType, creditCount } = result.data;
   const database = await getDatabase();
 
   const existingReservation = await database.get(
@@ -297,7 +328,7 @@ app.put("/reservations/:id", checkLogin, async (request, response) => {
     });
   }
 
-  const hasConflict = await checkReservationConflict(
+  const conflictResult = await checkReservationConflict(
     database,
     testDate,
     creditCount,
@@ -306,16 +337,16 @@ app.put("/reservations/:id", checkLogin, async (request, response) => {
     reservationId
   );
 
-  if (hasConflict) {
+  if (conflictResult.hasConflict) {
     return response.status(409).json({
-      error: "A test with the same credits is already reserved on this day"
+      error: conflictResult.message
     });
   }
 
   await database.run(
     `
       UPDATE reservations
-      SET test_date = ?, subject_name = ?, grade_level = ?, program_type = ?, credit_count = ?
+      SET test_date = ?, subject_name = ?, grade_level = ?, program_type = ?, test_type = ?, credit_count = ?
       WHERE id = ?
     `,
     [
@@ -323,6 +354,7 @@ app.put("/reservations/:id", checkLogin, async (request, response) => {
       subjectName,
       gradeLevel,
       programType || null,
+      testType,
       creditCount,
       reservationId
     ]
@@ -337,6 +369,7 @@ app.put("/reservations/:id", checkLogin, async (request, response) => {
         reservations.subject_name,
         reservations.grade_level,
         reservations.program_type,
+        reservations.test_type,
         reservations.credit_count,
         teachers.username
       FROM reservations

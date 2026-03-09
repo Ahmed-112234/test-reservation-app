@@ -30,11 +30,26 @@ export async function getDatabase() {
       subject_name TEXT NOT NULL,
       grade_level INTEGER NOT NULL,
       program_type TEXT,
-      credit_count INTEGER NOT NULL,
+      test_type TEXT NOT NULL DEFAULT 'summative',
+      credit_count REAL NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE
     );
   `);
+
+  try {
+    await database.exec(`
+      ALTER TABLE reservations ADD COLUMN program_type TEXT;
+    `);
+  } catch {
+  }
+
+  try {
+    await database.exec(`
+      ALTER TABLE reservations ADD COLUMN test_type TEXT NOT NULL DEFAULT 'summative';
+    `);
+  } catch {
+  }
 
   await addSampleTeachers();
 
