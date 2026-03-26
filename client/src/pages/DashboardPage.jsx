@@ -7,7 +7,7 @@ import { sendApiRequest } from "../api.js";
 
 const subjectOptions = [
   { name: "Arabic", category: "IB" },
-  { name: "Business Management", category: "IB" },
+  { name: "Business Manag.", category: "IB" },
   { name: "Computer Science", category: "General" },
   { name: "Economics", category: "IB" },
   { name: "English Lang-Lit", category: "IB" },
@@ -18,6 +18,7 @@ const subjectOptions = [
   { name: "Arabic Acquisition", category: "MYP" },
   { name: "Arabic literature", category: "MYP" },
   { name: "English Lang-Lit", category: "MYP" },
+  { name: "Homeroom Secondary School", category: "Section 1" },
   { name: "Integrated Humanities", category: "MYP" },
   { name: "Integrated Science", category: "MYP" },
   { name: "Islamic Studies", category: "MYP" },
@@ -27,11 +28,14 @@ const subjectOptions = [
   { name: "Biology", category: "MYP" },
   { name: "Chemistry & Physics", category: "MYP" },
   { name: "English Lang-Lit", category: "MYP" },
-  { name: "Integrated Humanities", category: "MYP" },
+  { name: "Integrated Humanities ", category: "MYP" },
   { name: "Islamic Studies", category: "General" },
   { name: "Mathematics", category: "MYP" },
   { name: "PE", category: "General" },
+  { name: "Theatre", category: "MYP" }
 ];
+
+const sectionOptions = ["A", "B", "C", "D"];
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -57,8 +61,9 @@ export default function DashboardPage() {
   const [formData, setFormData] = useState({
     testDate: "",
     subjectName: "Computer Science",
-    gradeLevel: 10,
-    programType: "",
+    sectionName: "11A",
+    gradeLevel: 11,
+    programType: "High School",
     testType: "summative",
     creditCount: 1
   });
@@ -67,6 +72,7 @@ export default function DashboardPage() {
     id: null,
     testDate: "",
     subjectName: "",
+    sectionName: "",
     gradeLevel: 10,
     programType: "",
     testType: "summative",
@@ -96,7 +102,7 @@ export default function DashboardPage() {
 
   const calendarEvents = useMemo(() => {
     return reservationList.map((reservation) => {
-      let eventTitle = `${reservation.subject_name} • G${reservation.grade_level}`;
+      let eventTitle = `${reservation.subject_name} • ${reservation.section_name} • G${reservation.grade_level}`;
 
       if (reservation.program_type) {
         eventTitle += ` • ${reservation.program_type}`;
@@ -234,81 +240,6 @@ export default function DashboardPage() {
     }, 0);
   }
 
-  function isDateUnavailable(dateText) {
-    if (isOutsideBookingWindow(dateText)) {
-      return true;
-    }
-
-    const selectedGradeIsSenior =
-      formData.gradeLevel === 11 || formData.gradeLevel === 12;
-
-    const sameDayReservations = reservationList.filter(
-      (reservation) => reservation.test_date === dateText
-    );
-
-    const reservedCredits = sameDayReservations.reduce(
-      (total, reservation) => total + Number(reservation.credit_count),
-      0
-    );
-
-    if (reservedCredits + Number(formData.creditCount) > 1.5) {
-      return true;
-    }
-
-    return sameDayReservations.some((reservation) => {
-      if (Number(reservation.credit_count) !== Number(formData.creditCount)) {
-        return false;
-      }
-
-      const reservationGradeIsSenior =
-        reservation.grade_level === 11 || reservation.grade_level === 12;
-
-      if (selectedGradeIsSenior && reservationGradeIsSenior) {
-        return reservation.program_type === formData.programType;
-      }
-
-      return true;
-    });
-  }
-
-  function isEditDateUnavailable(dateText) {
-    if (isOutsideBookingWindow(dateText)) {
-      return true;
-    }
-
-    const selectedGradeIsSenior =
-      modalFormData.gradeLevel === 11 || modalFormData.gradeLevel === 12;
-
-    const sameDayReservations = reservationList.filter(
-      (reservation) =>
-        reservation.id !== modalFormData.id && reservation.test_date === dateText
-    );
-
-    const reservedCredits = sameDayReservations.reduce(
-      (total, reservation) => total + Number(reservation.credit_count),
-      0
-    );
-
-    if (reservedCredits + Number(modalFormData.creditCount) > 1.5) {
-      return true;
-    }
-
-    return sameDayReservations.some((reservation) => {
-      if (Number(reservation.credit_count) !== Number(modalFormData.creditCount)) {
-        return false;
-      }
-
-      const reservationGradeIsSenior =
-        reservation.grade_level === 11 || reservation.grade_level === 12;
-
-      if (selectedGradeIsSenior && reservationGradeIsSenior) {
-        return reservation.program_type === modalFormData.programType;
-      }
-
-      return true;
-    });
-  }
-
   function validateMainForm() {
     const errors = {};
 
@@ -318,6 +249,10 @@ export default function DashboardPage() {
 
     if (!formData.subjectName.trim()) {
       errors.subjectName = "Subject is required";
+    }
+
+    if (!formData.sectionName.trim()) {
+      errors.sectionName = "Section is required";
     }
 
     if (!Number.isInteger(Number(formData.gradeLevel))) {
@@ -370,6 +305,10 @@ export default function DashboardPage() {
       errors.subjectName = "Subject is required";
     }
 
+    if (!modalFormData.sectionName.trim()) {
+      errors.sectionName = "Section is required";
+    }
+
     if (!Number.isInteger(Number(modalFormData.gradeLevel))) {
       errors.gradeLevel = "Grade must be a number";
     } else if (Number(modalFormData.gradeLevel) < 1 || Number(modalFormData.gradeLevel) > 12) {
@@ -406,10 +345,6 @@ export default function DashboardPage() {
       getReservedCreditsForEditDay(modalFormData.testDate) + modalCredits > 1.5
     ) {
       errors.testDate = "This day has reached the maximum total of 1.5 credits";
-    }
-
-    if (modalFormData.testDate && !errors.testDate && isEditDateUnavailable(modalFormData.testDate)) {
-      errors.testDate = "This date is unavailable for the selected credits";
     }
 
     setModalValidationErrors(errors);
@@ -458,6 +393,7 @@ export default function DashboardPage() {
       id: reservation.id,
       testDate: reservation.test_date,
       subjectName: reservation.subject_name,
+      sectionName: reservation.section_name,
       gradeLevel: reservation.grade_level,
       programType: reservation.program_type || "",
       testType: reservation.test_type || "summative",
@@ -475,6 +411,8 @@ export default function DashboardPage() {
   }
 
   async function handleUpdateReservation() {
+    setErrorMessage("");
+
     if (!validateModalForm()) {
       return;
     }
@@ -497,7 +435,6 @@ export default function DashboardPage() {
       setSelectedReservation(response.reservation);
       setIsEditMode(false);
       setModalValidationErrors({});
-      setErrorMessage("");
     } catch (error) {
       setErrorMessage(error.message);
     }
@@ -597,12 +534,8 @@ export default function DashboardPage() {
             events={calendarEvents}
             height="auto"
             dateClick={(info) => {
-              if (isDateUnavailable(info.dateStr)) {
-                if (isOutsideBookingWindow(info.dateStr)) {
-                  setErrorMessage("This date is outside the booking window.");
-                } else {
-                  setErrorMessage("This date is unavailable for the selected credits or exceeds 1.5 total credits.");
-                }
+              if (isOutsideBookingWindow(info.dateStr)) {
+                setErrorMessage("This date is outside the booking window.");
                 return;
               }
 
@@ -675,6 +608,27 @@ export default function DashboardPage() {
             </button>
             {validationErrors.subjectName && (
               <div className="validationText">{validationErrors.subjectName}</div>
+            )}
+
+            <label className="inputLabel">Section</label>
+            <select
+              className="textInput"
+              value={formData.sectionName}
+              onChange={(event) =>
+                setFormData({
+                  ...formData,
+                  sectionName: event.target.value
+                })
+              }
+            >
+              {sectionOptions.map((sectionName) => (
+                <option key={sectionName} value={sectionName}>
+                  {sectionName}
+                </option>
+              ))}
+            </select>
+            {validationErrors.sectionName && (
+              <div className="validationText">{validationErrors.sectionName}</div>
             )}
 
             <label className="inputLabel">Grade</label>
@@ -759,14 +713,14 @@ export default function DashboardPage() {
             <button
               className="mainButton"
               onClick={handleReservation}
-              disabled={!formData.testDate || isDateUnavailable(formData.testDate)}
+              disabled={!formData.testDate}
             >
               Reserve
             </button>
           </div>
 
           <p className="formHelpText">
-            Rule: credits must be between 0.5 and 1, each day can only have 1.5 credits in total, and each reservation must have a test type.
+            Rule: add the subject and section, then the system checks whether any student is already sitting another booked test on that day. Credits must be between 0.5 and 1, and each day can only have 1.5 credits in total.
           </p>
         </div>
       </div>
@@ -849,6 +803,28 @@ export default function DashboardPage() {
               )}
               {modalValidationErrors.subjectName && (
                 <div className="validationText">{modalValidationErrors.subjectName}</div>
+              )}
+
+              <label className="inputLabel">Section</label>
+              <select
+                className="textInput"
+                value={modalFormData.sectionName}
+                disabled={!isEditMode}
+                onChange={(event) =>
+                  setModalFormData({
+                    ...modalFormData,
+                    sectionName: event.target.value
+                  })
+                }
+              >
+                {sectionOptions.map((sectionName) => (
+                  <option key={sectionName} value={sectionName}>
+                    {sectionName}
+                  </option>
+                ))}
+              </select>
+              {modalValidationErrors.sectionName && (
+                <div className="validationText">{modalValidationErrors.sectionName}</div>
               )}
 
               <label className="inputLabel">Grade</label>
@@ -957,6 +933,7 @@ export default function DashboardPage() {
                         id: selectedReservation.id,
                         testDate: selectedReservation.test_date,
                         subjectName: selectedReservation.subject_name,
+                        sectionName: selectedReservation.section_name,
                         gradeLevel: selectedReservation.grade_level,
                         programType: selectedReservation.program_type || "",
                         testType: selectedReservation.test_type || "summative",
@@ -1079,6 +1056,7 @@ export default function DashboardPage() {
                 <option value="IB">IB</option>
                 <option value="MYP">MYP</option>
                 <option value="General">General</option>
+                <option value="Section 1">Section 1</option>
               </select>
 
               <select

@@ -97,6 +97,7 @@ app.get("/reservations", checkLogin, async (request, response) => {
       reservations.teacher_id,
       reservations.test_date,
       reservations.subject_name,
+      reservations.section_name,
       reservations.grade_level,
       reservations.program_type,
       reservations.test_type,
@@ -113,19 +114,66 @@ app.get("/reservations", checkLogin, async (request, response) => {
 const reservationSchema = z.object({
   testDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   subjectName: z.string().min(1),
+  sectionName: z.string().min(1),
   gradeLevel: z.number().int().min(1).max(12),
   programType: z.string().optional(),
   testType: z.enum(["summative", "formative"]),
   creditCount: z.number().min(0.5).max(1)
 });
 
-/* This function checks if a reservation conflicts with another one. */
+/* This function gets student ids for a reservation based on subject, section, grade, and program. */
+async function getStudentIdsForReservation(database, reservationData) {
+  const { subjectName, sectionName, gradeLevel, programType } = reservationData;
+
+  if (gradeLevel === 11 || gradeLevel === 12) {
+    const rows = await database.all(
+      `
+        SELECT students.id
+        FROM students
+        JOIN student_subjects ON student_subjects.student_id = students.id
+        WHERE students.grade_level = ?
+          AND students.section_name = ?
+          AND students.program_type = ?
+          AND student_subjects.subject_name = ?
+      `,
+      [gradeLevel, sectionName, programType || null, subjectName]
+    );
+
+    return rows.map((row) => row.id);
+  }
+
+  const rows = await database.all(
+    `
+      SELECT students.id
+      FROM students
+      JOIN student_subjects ON student_subjects.student_id = students.id
+      WHERE students.grade_level = ?
+        AND students.section_name = ?
+        AND student_subjects.subject_name = ?
+    `,
+    [gradeLevel, sectionName, subjectName]
+  );
+
+  return rows.map((row) => row.id);
+}
+
+/* This function checks whether two student lists overlap. */
+function hasStudentOverlap(firstStudentIds, secondStudentIds) {
+  const secondStudentSet = new Set(secondStudentIds);
+
+  for (const studentId of firstStudentIds) {
+    if (secondStudentSet.has(studentId)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/* This function checks whether a reservation breaks any booking rules. */
 async function checkReservationConflict(
   database,
-  testDate,
-  creditCount,
-  gradeLevel,
-  programType,
+  newReservation,
   reservationIdToIgnore = null
 ) {
   const existingReservations = await database.all(
@@ -134,7 +182,7 @@ async function checkReservationConflict(
       FROM reservations
       WHERE test_date = ?
     `,
-    [testDate]
+    [newReservation.testDate]
   );
 
   let totalCreditsForDay = 0;
@@ -147,36 +195,38 @@ async function checkReservationConflict(
     totalCreditsForDay += Number(reservation.credit_count);
   }
 
-  if (totalCreditsForDay + Number(creditCount) > 1.5) {
+  if (totalCreditsForDay + Number(newReservation.creditCount) > 1.5) {
     return {
       hasConflict: true,
       message: "This day has reached the maximum total of 1.5 credits"
     };
   }
 
+  const newReservationStudentIds = await getStudentIdsForReservation(database, newReservation);
+
   for (const reservation of existingReservations) {
     if (reservationIdToIgnore && reservation.id === reservationIdToIgnore) {
       continue;
     }
 
-    if (Number(reservation.credit_count) !== Number(creditCount)) {
-      continue;
+    const existingReservationStudentIds = await getStudentIdsForReservation(database, {
+      subjectName: reservation.subject_name,
+      sectionName: reservation.section_name,
+      gradeLevel: reservation.grade_level,
+      programType: reservation.program_type
+    });
+
+    const overlapExists = hasStudentOverlap(
+      newReservationStudentIds,
+      existingReservationStudentIds
+    );
+
+    if (overlapExists) {
+      return {
+        hasConflict: true,
+        message: "This booking is not allowed because at least one student is in both classes on this day"
+      };
     }
-
-    const newReservationIsSenior = gradeLevel === 11 || gradeLevel === 12;
-    const existingReservationIsSenior =
-      reservation.grade_level === 11 || reservation.grade_level === 12;
-
-    if (newReservationIsSenior && existingReservationIsSenior) {
-      if (reservation.program_type !== programType) {
-        continue;
-      }
-    }
-
-    return {
-      hasConflict: true,
-      message: "A test with the same credits is already reserved on this day"
-    };
   }
 
   return {
@@ -193,7 +243,15 @@ app.post("/reservations", checkLogin, async (request, response) => {
     return response.status(400).json({ error: "Invalid reservation data" });
   }
 
-  const { testDate, subjectName, gradeLevel, programType, testType, creditCount } = result.data;
+  const {
+    testDate,
+    subjectName,
+    sectionName,
+    gradeLevel,
+    programType,
+    testType,
+    creditCount
+  } = result.data;
 
   const today = new Date();
   const firstAllowedDate = formatDateOnly(addDays(today, 7));
@@ -220,13 +278,14 @@ app.post("/reservations", checkLogin, async (request, response) => {
   const database = await getDatabase();
 
   try {
-    const conflictResult = await checkReservationConflict(
-      database,
+    const conflictResult = await checkReservationConflict(database, {
       testDate,
-      creditCount,
+      subjectName,
+      sectionName,
       gradeLevel,
-      programType || null
-    );
+      programType: programType || null,
+      creditCount
+    });
 
     if (conflictResult.hasConflict) {
       return response.status(409).json({
@@ -237,13 +296,14 @@ app.post("/reservations", checkLogin, async (request, response) => {
     const insertResult = await database.run(
       `
         INSERT INTO reservations
-        (teacher_id, test_date, subject_name, grade_level, program_type, test_type, credit_count)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        (teacher_id, test_date, subject_name, section_name, grade_level, program_type, test_type, credit_count)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         request.teacher.id,
         testDate,
         subjectName,
+        sectionName,
         gradeLevel,
         programType || null,
         testType,
@@ -258,6 +318,7 @@ app.post("/reservations", checkLogin, async (request, response) => {
           reservations.teacher_id,
           reservations.test_date,
           reservations.subject_name,
+          reservations.section_name,
           reservations.grade_level,
           reservations.program_type,
           reservations.test_type,
@@ -290,7 +351,16 @@ app.put("/reservations/:id", checkLogin, async (request, response) => {
     return response.status(400).json({ error: "Invalid reservation data" });
   }
 
-  const { testDate, subjectName, gradeLevel, programType, testType, creditCount } = result.data;
+  const {
+    testDate,
+    subjectName,
+    sectionName,
+    gradeLevel,
+    programType,
+    testType,
+    creditCount
+  } = result.data;
+
   const database = await getDatabase();
 
   const existingReservation = await database.get(
@@ -330,10 +400,14 @@ app.put("/reservations/:id", checkLogin, async (request, response) => {
 
   const conflictResult = await checkReservationConflict(
     database,
-    testDate,
-    creditCount,
-    gradeLevel,
-    programType || null,
+    {
+      testDate,
+      subjectName,
+      sectionName,
+      gradeLevel,
+      programType: programType || null,
+      creditCount
+    },
     reservationId
   );
 
@@ -346,12 +420,13 @@ app.put("/reservations/:id", checkLogin, async (request, response) => {
   await database.run(
     `
       UPDATE reservations
-      SET test_date = ?, subject_name = ?, grade_level = ?, program_type = ?, test_type = ?, credit_count = ?
+      SET test_date = ?, subject_name = ?, section_name = ?, grade_level = ?, program_type = ?, test_type = ?, credit_count = ?
       WHERE id = ?
     `,
     [
       testDate,
       subjectName,
+      sectionName,
       gradeLevel,
       programType || null,
       testType,
@@ -367,6 +442,7 @@ app.put("/reservations/:id", checkLogin, async (request, response) => {
         reservations.teacher_id,
         reservations.test_date,
         reservations.subject_name,
+        reservations.section_name,
         reservations.grade_level,
         reservations.program_type,
         reservations.test_type,
