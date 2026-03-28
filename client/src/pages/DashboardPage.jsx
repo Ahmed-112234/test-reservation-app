@@ -5,7 +5,7 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import { sendApiRequest } from "../api.js";
 
-const subjectOptions = [
+const rawSubjectOptions = [
   { name: "Arabic", category: "IB" },
   { name: "Business Manag.", category: "IB" },
   { name: "Computer Science", category: "General" },
@@ -34,6 +34,76 @@ const subjectOptions = [
   { name: "PE", category: "General" },
   { name: "Theatre", category: "MYP" }
 ];
+
+const normalizeText = (value = "") =>
+  String(value).trim().toLowerCase().replace(/\s+/g, " ");
+
+const subjectOptions = Array.from(
+  new Map(
+    rawSubjectOptions.map((subject) => {
+      const cleanName = String(subject.name).trim().replace(/\s+/g, " ");
+      const cleanCategory = String(subject.category).trim().replace(/\s+/g, " ");
+      const id = `${normalizeText(cleanCategory)}::${normalizeText(cleanName)}`;
+
+      return [
+        id,
+        {
+          id,
+          name: cleanName,
+          category: cleanCategory
+        }
+      ];
+    })
+  ).values()
+);
+
+const filterAndSortSubjects = (items, searchText, sortOption, categoryFilter) => {
+  const normalizedSearchText = normalizeText(searchText);
+  const normalizedCategoryFilter = normalizeText(categoryFilter);
+
+  let list = items.filter((subject) => {
+    const matchesCategory =
+      normalizedCategoryFilter === "all" ||
+      normalizeText(subject.category) === normalizedCategoryFilter;
+
+    if (!matchesCategory) {
+      return false;
+    }
+
+    if (!normalizedSearchText) {
+      return true;
+    }
+
+    const searchTokens = normalizedSearchText.split(" ").filter(Boolean);
+    const haystack = normalizeText(`${subject.name} ${subject.category}`);
+
+    return searchTokens.every((token) => haystack.includes(token));
+  });
+
+  list.sort((firstItem, secondItem) => {
+    const firstName = normalizeText(firstItem.name);
+    const secondName = normalizeText(secondItem.name);
+    const firstCategory = normalizeText(firstItem.category);
+    const secondCategory = normalizeText(secondItem.category);
+
+    if (sortOption === "name-desc") {
+      return secondName.localeCompare(firstName);
+    }
+
+    if (sortOption === "category") {
+      const categoryCompare = firstCategory.localeCompare(secondCategory);
+      if (categoryCompare !== 0) {
+        return categoryCompare;
+      }
+
+      return firstName.localeCompare(secondName);
+    }
+
+    return firstName.localeCompare(secondName);
+  });
+
+  return list;
+};
 
 const sectionOptions = ["A", "B", "C", "D"];
 
@@ -125,79 +195,46 @@ export default function DashboardPage() {
     teacher &&
     Number(selectedReservation.teacher_id) === Number(teacher.id);
 
+  const subjectCategoryOptions = useMemo(() => {
+    return [
+      "All",
+      ...Array.from(new Set(subjectOptions.map((subject) => subject.category))).sort((a, b) =>
+        a.localeCompare(b)
+      )
+    ];
+  }, []);
+
   const filteredSubjectOptions = useMemo(() => {
-    const normalizedSearchText = subjectSearchText.trim().toLowerCase();
-
-    let list = [...subjectOptions];
-
-    if (subjectCategoryFilter !== "All") {
-      list = list.filter((subject) => subject.category === subjectCategoryFilter);
-    }
-
-    if (normalizedSearchText) {
-      list = list.filter((subject) =>
-        subject.name.toLowerCase().includes(normalizedSearchText) ||
-        subject.category.toLowerCase().includes(normalizedSearchText)
-      );
-    }
-
-    if (subjectSortOption === "name-asc") {
-      list.sort((firstItem, secondItem) => firstItem.name.localeCompare(secondItem.name));
-    }
-
-    if (subjectSortOption === "name-desc") {
-      list.sort((firstItem, secondItem) => secondItem.name.localeCompare(firstItem.name));
-    }
-
-    if (subjectSortOption === "category") {
-      list.sort((firstItem, secondItem) => {
-        const categoryCompare = firstItem.category.localeCompare(secondItem.category);
-        if (categoryCompare !== 0) {
-          return categoryCompare;
-        }
-        return firstItem.name.localeCompare(secondItem.name);
-      });
-    }
-
-    return list;
+    return filterAndSortSubjects(
+      subjectOptions,
+      subjectSearchText,
+      subjectSortOption,
+      subjectCategoryFilter
+    );
   }, [subjectSearchText, subjectSortOption, subjectCategoryFilter]);
 
   const filteredEditSubjectOptions = useMemo(() => {
-    const normalizedSearchText = editSubjectSearchText.trim().toLowerCase();
-
-    let list = [...subjectOptions];
-
-    if (editSubjectCategoryFilter !== "All") {
-      list = list.filter((subject) => subject.category === editSubjectCategoryFilter);
-    }
-
-    if (normalizedSearchText) {
-      list = list.filter((subject) =>
-        subject.name.toLowerCase().includes(normalizedSearchText) ||
-        subject.category.toLowerCase().includes(normalizedSearchText)
-      );
-    }
-
-    if (editSubjectSortOption === "name-asc") {
-      list.sort((firstItem, secondItem) => firstItem.name.localeCompare(secondItem.name));
-    }
-
-    if (editSubjectSortOption === "name-desc") {
-      list.sort((firstItem, secondItem) => secondItem.name.localeCompare(firstItem.name));
-    }
-
-    if (editSubjectSortOption === "category") {
-      list.sort((firstItem, secondItem) => {
-        const categoryCompare = firstItem.category.localeCompare(secondItem.category);
-        if (categoryCompare !== 0) {
-          return categoryCompare;
-        }
-        return firstItem.name.localeCompare(secondItem.name);
-      });
-    }
-
-    return list;
+    return filterAndSortSubjects(
+      subjectOptions,
+      editSubjectSearchText,
+      editSubjectSortOption,
+      editSubjectCategoryFilter
+    );
   }, [editSubjectSearchText, editSubjectSortOption, editSubjectCategoryFilter]);
+
+  function openMainSubjectModal() {
+    setSubjectSearchText("");
+    setSubjectSortOption("name-asc");
+    setSubjectCategoryFilter("All");
+    setIsSubjectModalOpen(true);
+  }
+
+  function openEditSubjectModal() {
+    setEditSubjectSearchText("");
+    setEditSubjectSortOption("name-asc");
+    setEditSubjectCategoryFilter("All");
+    setIsEditSubjectModalOpen(true);
+  }
 
   function handleLogout() {
     localStorage.removeItem("token");
@@ -601,7 +638,7 @@ export default function DashboardPage() {
             <button
               type="button"
               className="subjectPickerButton"
-              onClick={() => setIsSubjectModalOpen(true)}
+              onClick={openMainSubjectModal}
             >
               <span>{formData.subjectName || "Select subject"}</span>
               <span className="subjectPickerIcon">⌕</span>
@@ -788,7 +825,7 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   className="subjectPickerButton"
-                  onClick={() => setIsEditSubjectModalOpen(true)}
+                  onClick={openEditSubjectModal}
                 >
                   <span>{modalFormData.subjectName || "Select subject"}</span>
                   <span className="subjectPickerIcon">⌕</span>
@@ -981,11 +1018,11 @@ export default function DashboardPage() {
                 value={subjectCategoryFilter}
                 onChange={(event) => setSubjectCategoryFilter(event.target.value)}
               >
-                <option value="All">All categories</option>
-                <option value="IB">IB</option>
-                <option value="MYP">MYP</option>
-                <option value="General">General</option>
-                <option value="Section 1">Section 1</option>
+                {subjectCategoryOptions.map((category) => (
+                  <option key={category} value={category}>
+                    {category === "All" ? "All categories" : category}
+                  </option>
+                ))}
               </select>
 
               <select
@@ -1002,7 +1039,7 @@ export default function DashboardPage() {
             <div className="subjectListBox">
               {filteredSubjectOptions.map((subject) => (
                 <button
-                  key={`${subject.category}-${subject.name}`}
+                  key={subject.id}
                   className="subjectOptionButton"
                   onClick={() => selectSubjectForMainForm(subject.name)}
                 >
@@ -1052,11 +1089,11 @@ export default function DashboardPage() {
                 value={editSubjectCategoryFilter}
                 onChange={(event) => setEditSubjectCategoryFilter(event.target.value)}
               >
-                <option value="All">All categories</option>
-                <option value="IB">IB</option>
-                <option value="MYP">MYP</option>
-                <option value="General">General</option>
-                <option value="Section 1">Section 1</option>
+                {subjectCategoryOptions.map((category) => (
+                  <option key={category} value={category}>
+                    {category === "All" ? "All categories" : category}
+                  </option>
+                ))}
               </select>
 
               <select
@@ -1073,7 +1110,7 @@ export default function DashboardPage() {
             <div className="subjectListBox">
               {filteredEditSubjectOptions.map((subject) => (
                 <button
-                  key={`${subject.category}-${subject.name}`}
+                  key={subject.id}
                   className="subjectOptionButton"
                   onClick={() => selectSubjectForEditForm(subject.name)}
                 >
