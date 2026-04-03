@@ -111,6 +111,45 @@ app.get("/reservations", checkLogin, async (request, response) => {
   response.json({ reservations: reservationList });
 });
 
+/* This function returns all students with their enrolled subjects. */
+app.get("/students", checkLogin, async (request, response) => {
+  const database = await getDatabase();
+
+  try {
+    const studentRows = await database.all(`
+      SELECT
+        students.id,
+        students.student_name,
+        students.grade_level,
+        students.section_name,
+        students.program_type,
+        COALESCE(GROUP_CONCAT(student_subjects.subject_name, '|||'), '') AS subjects_text
+      FROM students
+      LEFT JOIN student_subjects ON student_subjects.student_id = students.id
+      GROUP BY
+        students.id,
+        students.student_name,
+        students.grade_level,
+        students.section_name,
+        students.program_type
+      ORDER BY students.student_name ASC
+    `);
+
+    const students = studentRows.map((student) => ({
+      id: student.id,
+      student_name: student.student_name,
+      grade_level: student.grade_level,
+      section_name: student.section_name,
+      program_type: student.program_type,
+      subjects: student.subjects_text ? student.subjects_text.split("|||") : []
+    }));
+
+    response.json({ students });
+  } catch {
+    response.status(500).json({ error: "Failed to load students" });
+  }
+});
+
 const reservationSchema = z.object({
   testDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   subjectName: z.string().min(1),
@@ -185,20 +224,24 @@ async function checkReservationConflict(
     [newReservation.testDate]
   );
 
-  let totalCreditsForDay = 0;
+  let totalCreditsForGradeForDay = 0;
 
   for (const reservation of existingReservations) {
     if (reservationIdToIgnore && reservation.id === reservationIdToIgnore) {
       continue;
     }
 
-    totalCreditsForDay += Number(reservation.credit_count);
+    if (Number(reservation.grade_level) !== Number(newReservation.gradeLevel)) {
+      continue;
+    }
+
+    totalCreditsForGradeForDay += Number(reservation.credit_count);
   }
 
-  if (totalCreditsForDay + Number(newReservation.creditCount) > 1.5) {
+  if (totalCreditsForGradeForDay + Number(newReservation.creditCount) > 1.5) {
     return {
       hasConflict: true,
-      message: "This day has reached the maximum total of 1.5 credits"
+      message: `Grade ${newReservation.gradeLevel} has reached the maximum total of 1.5 credits for this day`
     };
   }
 

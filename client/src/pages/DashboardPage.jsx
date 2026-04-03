@@ -57,7 +57,9 @@ const subjectOptions = Array.from(
   ).values()
 );
 
-const filterAndSortSubjects = (items, searchText, sortOption, categoryFilter) => {
+const sectionOptions = [".1", ".2", ".3", ".4", ".5", ".6"];
+
+function filterAndSortSubjects(items, searchText, sortOption, categoryFilter) {
   const normalizedSearchText = normalizeText(searchText);
   const normalizedCategoryFilter = normalizeText(categoryFilter);
 
@@ -103,9 +105,7 @@ const filterAndSortSubjects = (items, searchText, sortOption, categoryFilter) =>
   });
 
   return list;
-};
-
-const sectionOptions = ["A", "B", "C", "D"];
+}
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -113,6 +113,8 @@ export default function DashboardPage() {
   const [teacher, setTeacher] = useState(null);
   const [reservationList, setReservationList] = useState([]);
   const [bookingWindow, setBookingWindow] = useState(null);
+  const [studentList, setStudentList] = useState([]);
+
   const [errorMessage, setErrorMessage] = useState("");
   const [validationErrors, setValidationErrors] = useState({});
   const [selectedReservation, setSelectedReservation] = useState(null);
@@ -128,10 +130,16 @@ export default function DashboardPage() {
   const [editSubjectSortOption, setEditSubjectSortOption] = useState("name-asc");
   const [editSubjectCategoryFilter, setEditSubjectCategoryFilter] = useState("All");
 
+  const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
+  const [studentSearchText, setStudentSearchText] = useState("");
+  const [studentSortOption, setStudentSortOption] = useState("name-asc");
+  const [studentGradeFilter, setStudentGradeFilter] = useState("All");
+  const [studentSectionFilter, setStudentSectionFilter] = useState("All");
+
   const [formData, setFormData] = useState({
     testDate: "",
     subjectName: "Computer Science",
-    sectionName: "11A",
+    sectionName: ".1",
     gradeLevel: 11,
     programType: "High School",
     testType: "summative",
@@ -142,7 +150,7 @@ export default function DashboardPage() {
     id: null,
     testDate: "",
     subjectName: "",
-    sectionName: "",
+    sectionName: ".1",
     gradeLevel: 10,
     programType: "",
     testType: "summative",
@@ -160,6 +168,13 @@ export default function DashboardPage() {
 
     const reservationsResponse = await sendApiRequest("/reservations");
     setReservationList(reservationsResponse.reservations);
+
+    try {
+      const studentsResponse = await sendApiRequest("/students");
+      setStudentList(studentsResponse.students || []);
+    } catch {
+      setStudentList([]);
+    }
   }
 
   useEffect(() => {
@@ -222,6 +237,73 @@ export default function DashboardPage() {
     );
   }, [editSubjectSearchText, editSubjectSortOption, editSubjectCategoryFilter]);
 
+  const studentGradeOptions = useMemo(() => {
+    return [
+      "All",
+      ...Array.from(new Set(studentList.map((student) => String(student.grade_level)))).sort(
+        (a, b) => Number(a) - Number(b)
+      )
+    ];
+  }, [studentList]);
+
+  const studentSectionOptions = useMemo(() => {
+    return [
+      "All",
+      ...Array.from(new Set(studentList.map((student) => student.section_name))).sort((a, b) =>
+        a.localeCompare(b)
+      )
+    ];
+  }, [studentList]);
+
+  const filteredStudentList = useMemo(() => {
+    const normalizedSearchText = studentSearchText.trim().toLowerCase();
+
+    let list = [...studentList];
+
+    if (studentGradeFilter !== "All") {
+      list = list.filter((student) => String(student.grade_level) === String(studentGradeFilter));
+    }
+
+    if (studentSectionFilter !== "All") {
+      list = list.filter((student) => student.section_name === studentSectionFilter);
+    }
+
+    if (normalizedSearchText) {
+      list = list.filter((student) => {
+        const subjectsText = (student.subjects || []).join(" ").toLowerCase();
+
+        return (
+          student.student_name.toLowerCase().includes(normalizedSearchText) ||
+          String(student.grade_level).includes(normalizedSearchText) ||
+          (student.section_name || "").toLowerCase().includes(normalizedSearchText) ||
+          (student.program_type || "").toLowerCase().includes(normalizedSearchText) ||
+          subjectsText.includes(normalizedSearchText)
+        );
+      });
+    }
+
+    if (studentSortOption === "name-asc") {
+      list.sort((a, b) => a.student_name.localeCompare(b.student_name));
+    }
+
+    if (studentSortOption === "name-desc") {
+      list.sort((a, b) => b.student_name.localeCompare(a.student_name));
+    }
+
+    if (studentSortOption === "grade-section") {
+      list.sort((a, b) => {
+        const gradeCompare = Number(a.grade_level) - Number(b.grade_level);
+        if (gradeCompare !== 0) {
+          return gradeCompare;
+        }
+
+        return String(a.section_name).localeCompare(String(b.section_name));
+      });
+    }
+
+    return list;
+  }, [studentList, studentSearchText, studentSortOption, studentGradeFilter, studentSectionFilter]);
+
   function openMainSubjectModal() {
     setSubjectSearchText("");
     setSubjectSortOption("name-asc");
@@ -234,6 +316,14 @@ export default function DashboardPage() {
     setEditSubjectSortOption("name-asc");
     setEditSubjectCategoryFilter("All");
     setIsEditSubjectModalOpen(true);
+  }
+
+  function openStudentModal() {
+    setStudentSearchText("");
+    setStudentSortOption("name-asc");
+    setStudentGradeFilter("All");
+    setStudentSectionFilter("All");
+    setIsStudentModalOpen(true);
   }
 
   function handleLogout() {
@@ -253,9 +343,13 @@ export default function DashboardPage() {
     );
   }
 
-  function getReservedCreditsForDay(dateText) {
+  function getReservedCreditsForDay(dateText, gradeLevel) {
     return reservationList.reduce((total, reservation) => {
       if (reservation.test_date !== dateText) {
+        return total;
+      }
+
+      if (Number(reservation.grade_level) !== Number(gradeLevel)) {
         return total;
       }
 
@@ -263,13 +357,17 @@ export default function DashboardPage() {
     }, 0);
   }
 
-  function getReservedCreditsForEditDay(dateText) {
+  function getReservedCreditsForEditDay(dateText, gradeLevel) {
     return reservationList.reduce((total, reservation) => {
       if (reservation.id === modalFormData.id) {
         return total;
       }
 
       if (reservation.test_date !== dateText) {
+        return total;
+      }
+
+      if (Number(reservation.grade_level) !== Number(gradeLevel)) {
         return total;
       }
 
@@ -308,10 +406,13 @@ export default function DashboardPage() {
 
     const mainCredits = Number(formData.creditCount);
 
-    if (Number.isNaN(mainCredits)) {
-      errors.creditCount = "Credits must be a number";
-    } else if (mainCredits < 0.5 || mainCredits > 1) {
-      errors.creditCount = "Credits must be between 0.5 and 1";
+    if (
+      formData.testDate &&
+      !errors.testDate &&
+      !errors.creditCount &&
+      getReservedCreditsForDay(formData.testDate, formData.gradeLevel) + mainCredits > 1.5
+    ) {
+      errors.testDate = `Grade ${formData.gradeLevel} has reached the maximum total of 1.5 credits for this day`;
     }
 
     if (formData.testDate && isOutsideBookingWindow(formData.testDate)) {
@@ -365,10 +466,13 @@ export default function DashboardPage() {
 
     const modalCredits = Number(modalFormData.creditCount);
 
-    if (Number.isNaN(modalCredits)) {
-      errors.creditCount = "Credits must be a number";
-    } else if (modalCredits < 0.5 || modalCredits > 1) {
-      errors.creditCount = "Credits must be between 0.5 and 1";
+    if (
+      modalFormData.testDate &&
+      !errors.testDate &&
+      !errors.creditCount &&
+      getReservedCreditsForEditDay(modalFormData.testDate, modalFormData.gradeLevel) + modalCredits > 1.5
+    ) {
+      errors.testDate = `Grade ${modalFormData.gradeLevel} has reached the maximum total of 1.5 credits for this day`;
     }
 
     if (modalFormData.testDate && isOutsideBookingWindow(modalFormData.testDate)) {
@@ -548,9 +652,15 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <button className="secondaryButton" onClick={handleLogout}>
-          Logout
-        </button>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button className="secondaryButton" onClick={openStudentModal}>
+            View Students
+          </button>
+
+          <button className="secondaryButton" onClick={handleLogout}>
+            Logout
+          </button>
+        </div>
       </div>
 
       {errorMessage && <div className="errorBox">{errorMessage}</div>}
@@ -607,7 +717,8 @@ export default function DashboardPage() {
           />
 
           <p className="calendarHelpText">
-            Dimmed dates are outside the booking window. Each day can have a maximum total of 1.5 credits.
+            Dimmed dates are outside the booking window. Each day can have a maximum total of 1.5
+            credits.
           </p>
         </div>
 
@@ -757,7 +868,9 @@ export default function DashboardPage() {
           </div>
 
           <p className="formHelpText">
-            Rule: add the subject and section, then the system checks whether any student is already sitting another booked test on that day. Credits must be between 0.5 and 1, and each day can only have 1.5 credits in total.
+            Rule: add the subject and section, then the system checks whether any student is
+            already sitting another booked test on that day. Credits must be between 0.5 and 1,
+            and each day can only have 1.5 credits in total.
           </p>
         </div>
       </div>
@@ -948,12 +1061,7 @@ export default function DashboardPage() {
               )}
 
               <label className="inputLabel">Teacher</label>
-              <input
-                className="textInput"
-                value={selectedReservation.username}
-                disabled
-                readOnly
-              />
+              <input className="textInput" value={selectedReservation.username} disabled readOnly />
 
               {isEditMode && (
                 <div className="modalBottomButtons">
@@ -1123,6 +1231,99 @@ export default function DashboardPage() {
 
               {filteredEditSubjectOptions.length === 0 && (
                 <div className="emptySubjectText">No subjects found.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isStudentModalOpen && (
+        <div className="modalOverlay" onClick={() => setIsStudentModalOpen(false)}>
+          <div className="subjectModalCard" onClick={(event) => event.stopPropagation()}>
+            <div className="modalTop">
+              <div>
+                <h2 className="modalTitle">Students List</h2>
+                <p className="modalText">Search, filter, or sort the student list.</p>
+              </div>
+
+              <button
+                className="iconButton"
+                onClick={() => setIsStudentModalOpen(false)}
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="subjectToolsRow">
+              <input
+                className="textInput"
+                placeholder="Search students or subjects..."
+                value={studentSearchText}
+                onChange={(event) => setStudentSearchText(event.target.value)}
+              />
+
+              <select
+                className="textInput subjectToolSelect"
+                value={studentGradeFilter}
+                onChange={(event) => setStudentGradeFilter(event.target.value)}
+              >
+                {studentGradeOptions.map((grade) => (
+                  <option key={grade} value={grade}>
+                    {grade === "All" ? "All grades" : `Grade ${grade}`}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                className="textInput subjectToolSelect"
+                value={studentSectionFilter}
+                onChange={(event) => setStudentSectionFilter(event.target.value)}
+              >
+                {studentSectionOptions.map((section) => (
+                  <option key={section} value={section}>
+                    {section === "All" ? "All sections" : `Section ${section}`}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                className="textInput subjectToolSelect"
+                value={studentSortOption}
+                onChange={(event) => setStudentSortOption(event.target.value)}
+              >
+                <option value="name-asc">Name A-Z</option>
+                <option value="name-desc">Name Z-A</option>
+                <option value="grade-section">Grade + Section</option>
+              </select>
+            </div>
+
+            <div className="subjectListBox">
+              {filteredStudentList.map((student) => (
+                <div
+                  key={student.id}
+                  className="subjectOptionButton"
+                  style={{ cursor: "default", textAlign: "left" }}
+                >
+                  <div className="subjectOptionName">{student.student_name}</div>
+
+                  <div
+                    className="subjectOptionMeta"
+                    style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}
+                  >
+                    <span>Grade {student.grade_level}</span>
+                    <span>Section {student.section_name}</span>
+                    <span>{student.program_type || "No program"}</span>
+                  </div>
+
+                  <div style={{ marginTop: "8px", fontSize: "14px" }}>
+                    <strong>Subjects:</strong> {(student.subjects || []).join(", ")}
+                  </div>
+                </div>
+              ))}
+
+              {filteredStudentList.length === 0 && (
+                <div className="emptySubjectText">No students found.</div>
               )}
             </div>
           </div>

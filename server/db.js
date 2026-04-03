@@ -11,7 +11,7 @@ export async function getDatabase() {
 
   database = await open({
     filename: "./data.sqlite",
-    driver: sqlite3.Database,
+    driver: sqlite3.Database
   });
 
   await database.exec(`
@@ -59,7 +59,6 @@ export async function getDatabase() {
   return database;
 }
 
-/* This function adds sample teachers the first time the app runs. */
 async function addSampleTeachers() {
   const teacherCount = await database.get("SELECT COUNT(*) AS count FROM teachers");
 
@@ -82,7 +81,6 @@ async function addSampleTeachers() {
   }
 }
 
-/* This function adds a sample student list and subject enrolments. */
 async function addSampleStudents() {
   const studentCount = await database.get("SELECT COUNT(*) AS count FROM students");
 
@@ -94,10 +92,10 @@ async function addSampleStudents() {
     {
       studentName: "Ali Hasan",
       gradeLevel: 11,
-      sectionName: "A",
+      sectionName: ".1",
       programType: "IB",
       subjects: [
-        "Arabic B",
+        "Arabic",
         "Economics",
         "English Lang-Lit",
         "Math Applications & Int.",
@@ -107,10 +105,10 @@ async function addSampleStudents() {
     {
       studentName: "Sara Ahmed",
       gradeLevel: 11,
-      sectionName: "A",
+      sectionName: ".2",
       programType: "IB",
       subjects: [
-        "Arabic B",
+        "Arabic",
         "Business Manag.",
         "English Lang-Lit",
         "Math Applications & Int.",
@@ -120,7 +118,7 @@ async function addSampleStudents() {
     {
       studentName: "Omar Khalid",
       gradeLevel: 11,
-      sectionName: "A",
+      sectionName: ".3",
       programType: "High School",
       subjects: [
         "Computer Science",
@@ -132,11 +130,11 @@ async function addSampleStudents() {
     {
       studentName: "Mariam Yusuf",
       gradeLevel: 11,
-      sectionName: "A",
+      sectionName: ".4",
       programType: "High School",
       subjects: [
-        "Business Manag.",
-        "English Lang-Lit",
+        "Computer Science",
+        "Islamic Studies",
         "National-Social Studies",
         "PE"
       ]
@@ -144,7 +142,7 @@ async function addSampleStudents() {
     {
       studentName: "Fatima Noor",
       gradeLevel: 10,
-      sectionName: "A",
+      sectionName: ".5",
       programType: null,
       subjects: [
         "Integrated Science",
@@ -156,33 +154,36 @@ async function addSampleStudents() {
     {
       studentName: "Ahmed Salem",
       gradeLevel: 10,
-      sectionName: "A",
+      sectionName: ".6",
       programType: null,
       subjects: [
         "Integrated Humanities",
         "Mathematics",
         "English Lang-Lit",
-        "Biology MYP"
+        "Biology"
       ]
     },
     {
       studentName: "Lina Hassan",
       gradeLevel: 12,
-      sectionName: "A",
+      sectionName: ".1",
       programType: "IB",
       subjects: [
+        "Arabic",
         "Economics",
         "English Lang-Lit",
+        "Math Applications & Int.",
         "Theory of Knowledge"
       ]
     },
     {
       studentName: "Khalid Jasim",
       gradeLevel: 12,
-      sectionName: "A",
+      sectionName: ".2",
       programType: "High School",
       subjects: [
         "Computer Science",
+        "Islamic Studies",
         "National-Social Studies",
         "PE"
       ]
